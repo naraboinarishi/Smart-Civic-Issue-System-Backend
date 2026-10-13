@@ -26,10 +26,18 @@ public class Issue {
     @Column(nullable = false, length = 100)
     private String category;
 
+    @Column(length = 20)
+    private String severity = "MEDIUM";
+
+    @Column(length = 20)
+    private String priority = "MEDIUM";
+
     @Column(nullable = false, length = 255)
     private String location;
+
     @Column
     private Double latitude;
+
     @Column
     private Double longitude;
 
@@ -75,6 +83,22 @@ public class Issue {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
     }
 
     public String getLocation() {
