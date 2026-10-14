@@ -2,8 +2,7 @@
 import { useState } from "react";
 import "./Register.css";
 
-const API_URL =
-  "https://smart-civic-issue-system-backend.onrender.com/api";
+const API_URL = 'https://smart-civic-issue-system-backend.onrender.com/api';
 
 function Register({ onRegistered, onShowLogin }) {
   const [form, setForm] = useState({
