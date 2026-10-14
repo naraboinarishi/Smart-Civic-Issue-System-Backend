@@ -51,11 +51,10 @@ public class SecurityConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(
-            List.of("http://localhost:5173",
-"https://smart-civic-issue-system-one.vercel.app",
-"https://smart-civic-issue-system-backend.onrender.com")
-        );
+        config.setAllowedOrigins(List.of(
+    "http://localhost:5173",
+    "https://smart-civic-issue-system-iv7kw3ke3.vercel.app"
+));
 
         config.setAllowedMethods(
             List.of(
