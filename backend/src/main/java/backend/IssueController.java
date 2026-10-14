@@ -21,7 +21,7 @@ import backend.repository.IssueRepository;
 
 @RestController
 @RequestMapping("/api/issues")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "https://smart-civic-issue-system-rb1yw4euy.vercel.app/")
 public class IssueController {
 
     private final IssueRepository issueRepository;
