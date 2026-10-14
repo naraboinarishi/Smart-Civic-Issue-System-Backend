@@ -14,9 +14,9 @@ import './App.css';
 import Register from './Register';
 import Login from './Login';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = 'https://smart-civic-issue-system-backend.onrender.com/api';
+const DEFAULT_CENTER = [17.385, 78.4867];
 
-// Fix default map marker icons in Vite.
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -25,8 +25,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl:
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-
-const DEFAULT_CENTER = [17.385, 78.4867];
 
 function normalizeStatus(status) {
   const value = String(status || 'PENDING')
@@ -50,20 +48,16 @@ function statusLabel(status) {
   return 'Pending';
 }
 
-// Recenter the map when GPS coordinates change.
 function MapUpdater({ position }) {
   const map = useMap();
 
   useEffect(() => {
-    if (position) {
-      map.setView(position, 16);
-    }
+    if (position) map.setView(position, 16);
   }, [map, position]);
 
   return null;
 }
 
-// Allow citizens to select a location by clicking the map.
 function MapClickHandler({ onPick }) {
   useMapEvents({
     click(event) {
@@ -74,37 +68,27 @@ function MapClickHandler({ onPick }) {
   return null;
 }
 
-// Reusable interactive map.
 function LocationMap({ latitude, longitude, onPick }) {
   const hasCoordinates =
-    latitude !== null &&
-    latitude !== undefined &&
-    longitude !== null &&
-    longitude !== undefined;
+    latitude != null && longitude != null;
 
   const position = hasCoordinates
     ? [latitude, longitude]
     : null;
 
   return (
-    <div style={{ marginTop: '12px', marginBottom: '18px' }}>
-      <p>
-        <strong>Select the issue location</strong>
-      </p>
-
-      <p>
-        Click the map to place the marker, or use the GPS button
-        to find your current location.
-      </p>
+    <div className="map-section">
+      <h3>📍 Select Issue Location</h3>
+      <p>Click the map to mark the exact location.</p>
 
       <MapContainer
         center={position || DEFAULT_CENTER}
         zoom={position ? 16 : 12}
-        scrollWheelZoom={true}
+        scrollWheelZoom
         style={{
-          height: '350px',
+          height: '340px',
           width: '100%',
-          borderRadius: '10px',
+          borderRadius: '14px',
           zIndex: 1,
         }}
       >
@@ -120,8 +104,8 @@ function LocationMap({ latitude, longitude, onPick }) {
       </MapContainer>
 
       {position && (
-        <p style={{ marginTop: '10px' }}>
-          <strong>Selected coordinates:</strong>{' '}
+        <p className="coordinates">
+          <strong>Selected GPS:</strong>{' '}
           {latitude.toFixed(6)}, {longitude.toFixed(6)}
         </p>
       )}
@@ -129,10 +113,52 @@ function LocationMap({ latitude, longitude, onPick }) {
   );
 }
 
+function StatusBadge({ status }) {
+  const value = normalizeStatus(status);
+
+  return (
+    <span className={`status-badge status-${value.toLowerCase()}`}>
+      {statusLabel(value)}
+    </span>
+  );
+}
+
+function PriorityBadge({ issue }) {
+  const priority = String(
+    issue.severity || issue.priority || 'MEDIUM'
+  ).toUpperCase();
+
+  return (
+    <span
+      className={`priority-badge priority-${priority.toLowerCase()}`}
+    >
+      {priority}
+    </span>
+  );
+}
+
+function IssueLocation({ issue }) {
+  if (issue.latitude == null || issue.longitude == null) {
+    return null;
+  }
+
+  return (
+    <p className="issue-detail">
+      <strong>GPS:</strong> {issue.latitude}, {issue.longitude}{' '}
+      <a
+        href={`https://www.openstreetmap.org/?mlat=${issue.latitude}&mlon=${issue.longitude}#map=17/${issue.latitude}/${issue.longitude}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        View Map ↗
+      </a>
+    </p>
+  );
+}
+
 function App() {
   const [page, setPage] = useState('home');
   const [user, setUser] = useState(null);
-
   const [issues, setIssues] = useState([]);
   const [backendStatus, setBackendStatus] = useState('Checking...');
   const [submitting, setSubmitting] = useState(false);
@@ -144,6 +170,7 @@ function App() {
   const [form, setForm] = useState({
     title: '',
     category: 'Pothole',
+    severity: 'MEDIUM',
     location: '',
     description: '',
     latitude: null,
@@ -179,7 +206,9 @@ function App() {
   const checkBackend = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/health`);
-      setBackendStatus(response.ok ? 'Connected' : 'Unavailable');
+      setBackendStatus(
+        response.ok ? 'Connected' : 'Unavailable'
+      );
     } catch {
       setBackendStatus('Disconnected');
     }
@@ -192,21 +221,21 @@ function App() {
   function changePage(nextPage) {
     setMessage('');
     setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleFormChange(event) {
     const { name, value } = event.target;
 
-    setForm((previousForm) => ({
-      ...previousForm,
+    setForm((previous) => ({
+      ...previous,
       [name]: value,
     }));
   }
 
-  // Save coordinates selected on the map.
   function selectMapLocation(latitude, longitude) {
-    setForm((previousForm) => ({
-      ...previousForm,
+    setForm((previous) => ({
+      ...previous,
       latitude,
       longitude,
     }));
@@ -214,7 +243,6 @@ function App() {
     setMessage('Map location selected successfully.');
   }
 
-  // Get the current device location using browser GPS.
   function getMyLocation() {
     if (!navigator.geolocation) {
       setMessage('GPS is not supported by this browser.');
@@ -229,15 +257,15 @@ function App() {
         const latitude = position.coords.latitude;
         const longitude = position.coords.longitude;
 
-        setForm((previousForm) => ({
-          ...previousForm,
+        setForm((previous) => ({
+          ...previous,
           latitude,
           longitude,
         }));
 
         setGettingLocation(false);
         setMessage(
-          `GPS location captured: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+          `GPS captured: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
         );
       },
       (error) => {
@@ -246,7 +274,7 @@ function App() {
 
         if (error.code === error.PERMISSION_DENIED) {
           setMessage(
-            'Location permission was denied. Allow location access in your browser and try again.'
+            'Location permission denied. Allow location access and try again.'
           );
         } else if (error.code === error.TIMEOUT) {
           setMessage(
@@ -254,7 +282,7 @@ function App() {
           );
         } else {
           setMessage(
-            'Unable to get your location. Check your device location settings and try again.'
+            'Unable to get your location. Check your device settings.'
           );
         }
       },
@@ -282,33 +310,36 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Failed to submit the issue.');
+        throw new Error(errorText || 'Failed to submit issue.');
       }
 
       const savedIssue = await response.json();
 
-      setIssues((previousIssues) => [
+      setIssues((previous) => [
         {
           ...savedIssue,
           status: normalizeStatus(savedIssue.status),
         },
-        ...previousIssues,
+        ...previous,
       ]);
 
       setForm({
         title: '',
         category: 'Pothole',
+        severity: 'MEDIUM',
         location: '',
         description: '',
         latitude: null,
         longitude: null,
       });
 
-      setMessage('Your civic issue has been reported successfully!');
+      setMessage(
+        'Your civic issue has been reported successfully!'
+      );
     } catch (error) {
       console.error('Error reporting issue:', error);
       setMessage(
-        'Could not submit the issue. Please check your backend and try again.'
+        'Could not submit the issue. Check your backend and try again.'
       );
     } finally {
       setSubmitting(false);
@@ -333,18 +364,22 @@ function App() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Failed to update issue status.');
+        throw new Error(
+          errorText || 'Failed to update issue status.'
+        );
       }
 
       const updatedIssue = await response.json();
 
-      setIssues((previousIssues) =>
-        previousIssues.map((issue) =>
+      setIssues((previous) =>
+        previous.map((issue) =>
           issue.id === issueId
             ? {
                 ...issue,
                 ...updatedIssue,
-                status: normalizeStatus(updatedIssue.status || status),
+                status: normalizeStatus(
+                  updatedIssue.status || status
+                ),
               }
             : issue
         )
@@ -354,7 +389,7 @@ function App() {
     } catch (error) {
       console.error('Error updating issue status:', error);
       setMessage(
-        'Could not update the status. Please check your backend and try again.'
+        'Could not update status. Check your backend and try again.'
       );
     } finally {
       setUpdatingIssueId(null);
@@ -369,7 +404,7 @@ function App() {
     if (portal === 'government') {
       if (role !== 'GOVERNMENT') {
         setMessage(
-          'Access denied. Please use an authorized government account.'
+          'Access denied. Use an authorized government account.'
         );
         return;
       }
@@ -427,19 +462,47 @@ function App() {
 
   return (
     <div className="app">
+      <div className="top-strip">
+        <span>🇮🇳 Smart Civic Issue Reporting System</span>
+        <span className="top-strip-right">
+          Public Services • Community Care
+        </span>
+      </div>
+
       <header className="header">
-        <div>
-          <h1>Smart Civic</h1>
-          <p>Report civic problems. Build a better community.</p>
-        </div>
+        <button
+          className="brand"
+          type="button"
+          onClick={() =>
+            changePage(
+              user
+                ? user.role === 'GOVERNMENT'
+                  ? 'government'
+                  : 'citizen'
+                : 'home'
+            )
+          }
+        >
+          <span className="brand-icon">🏛️</span>
+          <span className="brand-text">
+            <strong>SMART CIVIC</strong>
+            <small>Better Streets. Better Communities.</small>
+          </span>
+        </button>
 
         <div className="backend-status">
+          <span
+            className={`connection-dot ${
+              backendStatus === 'Connected' ? 'online' : 'offline'
+            }`}
+          />
           Backend: <strong>{backendStatus}</strong>
         </div>
       </header>
 
       <nav className="navigation">
         <button
+          className="nav-home"
           type="button"
           onClick={() =>
             changePage(
@@ -451,26 +514,43 @@ function App() {
             )
           }
         >
-          {user ? 'Dashboard' : 'Home'}
+          ⌂ Home / Dashboard
         </button>
 
-        {user && (
-          <>
-            <span>Signed in as {user.name || user.email}</span>
-
-            <button type="button" onClick={logout}>
-              Logout
+        <div className="nav-right">
+          {user ? (
+            <>
+              <span className="signed-in">
+                <span className="user-avatar">👤</span>
+                {user.name || user.email}
+              </span>
+              <button
+                className="btn-outline-light"
+                type="button"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              className="nav-login"
+              type="button"
+              onClick={() => changePage('citizenAuth')}
+            >
+              Citizen Login →
             </button>
-          </>
-        )}
+          )}
+        </div>
       </nav>
 
       <main className="container">
         {message && (
           <div className="message" role="status">
-            {message}
+            <span>{message}</span>
             <button
               type="button"
+              className="message-close"
               onClick={() => setMessage('')}
               aria-label="Dismiss message"
             >
@@ -480,79 +560,204 @@ function App() {
         )}
 
         {page === 'home' ? (
-          <section className="welcome">
-            <h2>Welcome to Smart Civic</h2>
+          <>
+            <section className="hero">
+              <div className="hero-content">
+                <span className="eyebrow">
+                  <span className="eyebrow-dot" />
+                  YOUR CITY, YOUR VOICE
+                </span>
+
+                <h1>
+                  Together, let's build a
+                  <span className="hero-highlight">
+                    {' '}better city.
+                  </span>
+                </h1>
+
+                <p className="hero-description">
+                  Notice a pothole, overflowing garbage, or a broken
+                  streetlight? Report civic problems and help make your
+                  community cleaner, safer, and better for everyone.
+                </p>
+
+                <div className="hero-actions">
+                  <button
+                    className="btn-primary btn-large"
+                    type="button"
+                    onClick={() => changePage('citizenAuth')}
+                  >
+                    Report an Issue →
+                  </button>
+
+                  <button
+                    className="btn-secondary btn-large"
+                    type="button"
+                    onClick={() => changePage('governmentLogin')}
+                  >
+                    Government Portal
+                  </button>
+                </div>
+
+                <div className="hero-note">
+                  <span>✓</span> Report problems. Track progress. Improve your city.
+                </div>
+              </div>
+
+              <div className="hero-visual">
+                <div className="hero-art">
+                  <div className="sun" />
+                  <div className="cloud cloud-one" />
+                  <div className="cloud cloud-two" />
+
+                  <div className="city-buildings">
+                    <div className="building building-one">
+                      <i /><i /><i /><i />
+                    </div>
+                    <div className="building building-two">
+                      <i /><i /><i /><i /><i /><i />
+                    </div>
+                    <div className="building building-three">
+                      <i /><i /><i /><i />
+                    </div>
+                    <div className="building building-four">
+                      <i /><i /><i /><i /><i /><i />
+                    </div>
+                  </div>
+
+                  <div className="city-road">
+                    <span className="road-line" />
+                  </div>
+
+                  <div className="floating-card">
+                    <span className="floating-icon">✓</span>
+                    <div>
+                      <strong>A better community</strong>
+                      <small>Starts with you</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="feature-section">
+              <div className="section-intro">
+                <span className="eyebrow">HOW IT WORKS</span>
+                <h2>Small actions. Real change.</h2>
+                <p>
+                  Three simple steps to help make your neighbourhood better.
+                </p>
+              </div>
+
+              <div className="feature-grid">
+                <article className="feature-card">
+                  <div className="feature-icon icon-blue">📢</div>
+                  <span className="feature-number">01</span>
+                  <h3>Report an Issue</h3>
+                  <p>
+                    Describe the problem, choose its category, and
+                    pinpoint the location on the map.
+                  </p>
+                </article>
+
+                <article className="feature-card">
+                  <div className="feature-icon icon-green">🔎</div>
+                  <span className="feature-number">02</span>
+                  <h3>Track Progress</h3>
+                  <p>
+                    Follow the status of reported problems as they move
+                    from pending to in progress and resolved.
+                  </p>
+                </article>
+
+                <article className="feature-card">
+                  <div className="feature-icon icon-orange">🏙️</div>
+                  <span className="feature-number">03</span>
+                  <h3>Improve Your City</h3>
+                  <p>
+                    Help citizens and government officers work together
+                    for cleaner, safer public spaces.
+                  </p>
+                </article>
+              </div>
+            </section>
+
+            <section className="callout">
+              <div>
+                <span className="eyebrow">MAKE YOUR VOICE COUNT</span>
+                <h2>See a problem? Let's solve it.</h2>
+                <p>Your report can be the first step towards a better neighbourhood.</p>
+              </div>
+              <button
+                className="btn-primary btn-large"
+                type="button"
+                onClick={() => changePage('citizenAuth')}
+              >
+                Get Started →
+              </button>
+            </section>
+          </>
+        ) : page === 'citizenAuth' ? (
+          <section className="panel auth-choice">
+            <span className="eyebrow">CITIZEN SERVICES</span>
+            <h2>Welcome to the Citizen Portal</h2>
             <p>
-              Report potholes, garbage, drainage problems, damaged
-              streetlights, and other civic issues in your area.
+              Sign in to report civic problems and follow their progress,
+              or create an account to get started.
             </p>
 
             <div className="portal-options">
               <button
+                className="btn-primary"
                 type="button"
-                onClick={() => changePage('citizenAuth')}
+                onClick={() => changePage('login')}
               >
-                Citizen Portal
+                Citizen Login →
               </button>
 
               <button
+                className="btn-secondary"
                 type="button"
-                onClick={() => changePage('governmentLogin')}
+                onClick={() => changePage('register')}
               >
-                Government Portal
+                Create Account
               </button>
             </div>
-          </section>
-        ) : page === 'citizenAuth' ? (
-          <section className="panel">
-            <h2>Citizen Portal</h2>
-            <p>
-              Register or log in to report and track civic problems.
-            </p>
 
             <button
-              type="button"
-              onClick={() => changePage('login')}
-            >
-              Citizen Login
-            </button>
-
-            <button
-              type="button"
-              onClick={() => changePage('register')}
-            >
-              Register
-            </button>
-
-            <button
+              className="text-button"
               type="button"
               onClick={() => changePage('home')}
             >
-              Back to Home
+              ← Back to Home
             </button>
           </section>
         ) : page === 'login' ? (
-          <Login
-            portal="citizen"
-            onLogin={(loggedInUser) =>
-              handleLoginSuccess(loggedInUser, 'citizen')
-            }
-            onShowRegister={() => changePage('register')}
-          />
+          <section className="panel auth-panel">
+            <Login
+              portal="citizen"
+              onLogin={(loggedInUser) =>
+                handleLoginSuccess(loggedInUser, 'citizen')
+              }
+              onShowRegister={() => changePage('register')}
+            />
+          </section>
         ) : page === 'register' ? (
-          <Register
-            onRegistered={() => {
-              setMessage('Registration successful! Please log in.');
-              setPage('login');
-            }}
-            onShowLogin={() => changePage('login')}
-          />
+          <section className="panel auth-panel">
+            <Register
+              onRegistered={() => {
+                setMessage('Registration successful! Please log in.');
+                setPage('login');
+              }}
+              onShowLogin={() => changePage('login')}
+            />
+          </section>
         ) : page === 'governmentLogin' ? (
-          <section className="panel">
+          <section className="panel auth-panel">
+            <span className="eyebrow">OFFICIAL ACCESS</span>
             <h2>Government Portal</h2>
-            <p>
-              Authorized government officers can sign in using their
-              Government ID and password.
+            <p className="muted">
+              Authorized officers can sign in to manage civic complaints.
             </p>
 
             <Login
@@ -563,73 +768,144 @@ function App() {
             />
 
             <button
+              className="text-button"
               type="button"
               onClick={() => changePage('home')}
             >
-              Back to Home
+              ← Back to Home
             </button>
           </section>
         ) : page === 'citizen' && user?.role === 'CITIZEN' ? (
           <>
-            <section className="welcome">
-              <h2>Citizen Dashboard</h2>
-              <p>
-                Welcome, {user.name || 'Citizen'}! Report civic
-                problems and track their status here.
-              </p>
+            <section className="dashboard-welcome">
+              <div>
+                <span className="eyebrow">CITIZEN SERVICES</span>
+                <h1>Welcome, {user.name || 'Citizen'}!</h1>
+                <p>
+                  Report a problem in your neighbourhood and help improve
+                  your community.
+                </p>
+              </div>
+              <div className="welcome-icon">🏘️</div>
+            </section>
+
+            <section className="dashboard-stats">
+              <article className="stat-card">
+                <span className="stat-icon icon-blue">📋</span>
+                <div>
+                  <p>Total Issues</p>
+                  <h2>{totalIssues}</h2>
+                </div>
+              </article>
+
+              <article className="stat-card">
+                <span className="stat-icon icon-orange">⏳</span>
+                <div>
+                  <p>Pending</p>
+                  <h2>{pendingIssues}</h2>
+                </div>
+              </article>
+
+              <article className="stat-card">
+                <span className="stat-icon icon-purple">⚙️</span>
+                <div>
+                  <p>In Progress</p>
+                  <h2>{inProgressIssues}</h2>
+                </div>
+              </article>
+
+              <article className="stat-card">
+                <span className="stat-icon icon-green">✓</span>
+                <div>
+                  <p>Resolved</p>
+                  <h2>{resolvedIssues}</h2>
+                </div>
+              </article>
             </section>
 
             <section className="panel">
-              <h2>Report a Civic Issue</h2>
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">NEW COMPLAINT</span>
+                  <h2>Report a Civic Issue</h2>
+                  <p className="muted">
+                    Fill in the details below to report a problem.
+                  </p>
+                </div>
+              </div>
 
               <form onSubmit={reportIssue}>
-                <label htmlFor="title">Issue Title</label>
-                <input
-                  id="title"
-                  name="title"
-                  type="text"
-                  value={form.title}
-                  onChange={handleFormChange}
-                  placeholder="Example: Road pothole near bus stop"
-                  required
-                />
+                <div className="form-grid">
+                  <div className="form-group full-width">
+                    <label htmlFor="title">Issue Title</label>
+                    <input
+                      id="title"
+                      name="title"
+                      type="text"
+                      value={form.title}
+                      onChange={handleFormChange}
+                      placeholder="E.g. Large pothole near bus stop"
+                      required
+                    />
+                  </div>
 
-                <label htmlFor="category">Issue Category</label>
-                <select
-                  id="category"
-                  name="category"
-                  value={form.category}
-                  onChange={handleFormChange}
-                  required
-                >
-                  <option value="Pothole">Pothole / Road Damage</option>
-                  <option value="Garbage">Garbage Collection</option>
-                  <option value="Water">Water Supply</option>
-                  <option value="Drainage">Drainage Problem</option>
-                  <option value="Streetlight">Streetlight Problem</option>
-                  <option value="Electricity">Electricity Problem</option>
-                  <option value="Other">Other</option>
-                </select>
+                  <div className="form-group">
+                    <label htmlFor="category">Issue Category</label>
+                    <select
+                      id="category"
+                      name="category"
+                      value={form.category}
+                      onChange={handleFormChange}
+                      required
+                    >
+                      <option value="Pothole">Pothole</option>
+                      <option value="Garbage">Garbage</option>
+                      <option value="Streetlight">Streetlight</option>
+                      <option value="Drainage">Drainage</option>
+                      <option value="Water Supply">Water Supply</option>
+                      <option value="Electricity">Electricity</option>
+                      <option value="Road Damage">Road Damage</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
 
-                <label htmlFor="location">Location / Street Name</label>
-                <input
-                  id="location"
-                  name="location"
-                  type="text"
-                  value={form.location}
-                  onChange={handleFormChange}
-                  placeholder="Enter the area or street"
-                  required
-                />
+                  <div className="form-group">
+                    <label htmlFor="severity">Issue Severity</label>
+                    <select
+                      id="severity"
+                      name="severity"
+                      value={form.severity}
+                      onChange={handleFormChange}
+                      required
+                    >
+                      <option value="CRITICAL">Critical - Immediate danger</option>
+                      <option value="HIGH">High - Urgent problem</option>
+                      <option value="MEDIUM">Medium - Normal repair</option>
+                      <option value="LOW">Low - Minor issue</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group full-width">
+                    <label htmlFor="location">Location / Street Name</label>
+                    <input
+                      id="location"
+                      name="location"
+                      type="text"
+                      value={form.location}
+                      onChange={handleFormChange}
+                      placeholder="Enter your area or street name"
+                      required
+                    />
+                  </div>
+                </div>
 
                 <button
+                  className="btn-secondary gps-button"
                   type="button"
                   onClick={getMyLocation}
                   disabled={gettingLocation}
                 >
-                  {gettingLocation
-                    ? 'Getting Location...'
-                    : 'Get My Location'}
+                  {gettingLocation ? 'Getting Location...' : '📍 Get My Location'}
                 </button>
 
                 <LocationMap
@@ -638,60 +914,74 @@ function App() {
                   onPick={selectMapLocation}
                 />
 
-                <label htmlFor="description">Description</label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={form.description}
-                  onChange={handleFormChange}
-                  placeholder="Explain the civic problem..."
-                  rows="4"
-                  required
-                />
+                <div className="form-group">
+                  <label htmlFor="description">Issue Description</label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={form.description}
+                    onChange={handleFormChange}
+                    placeholder="Explain the civic problem in detail..."
+                    rows={4}
+                    required
+                  />
+                </div>
 
-                <button type="submit" disabled={submitting}>
-                  {submitting ? 'Submitting...' : 'Submit Issue'}
+                <button
+                  className="btn-primary btn-large"
+                  type="submit"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Issue →'}
                 </button>
               </form>
             </section>
 
             <section className="panel">
               <div className="section-heading">
-                <h2>Reported Civic Issues</h2>
-                <button type="button" onClick={loadIssues}>
-                  Refresh
+                <div>
+                  <span className="eyebrow">YOUR COMPLAINTS</span>
+                  <h2>Reported Civic Issues</h2>
+                </div>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={loadIssues}
+                >
+                  ↻ Refresh
                 </button>
               </div>
 
               {issues.length === 0 ? (
-                <p>No civic issues have been reported yet.</p>
+                <div className="empty-state">
+                  <span>📭</span>
+                  <h3>No issues yet</h3>
+                  <p>Your reported issues will appear here.</p>
+                </div>
               ) : (
                 <div className="issues-list">
                   {issues.map((issue) => (
                     <article className="issue" key={issue.id}>
+                      <div className="issue-topline">
+                        <span className="issue-id">ISSUE #{issue.id}</span>
+                        <StatusBadge status={issue.status} />
+                      </div>
+
                       <h3>{issue.title}</h3>
-                      <p><strong>Category:</strong> {issue.category}</p>
-                      <p><strong>Location:</strong> {issue.location}</p>
-                      <p><strong>Description:</strong> {issue.description}</p>
-
-                      {issue.latitude != null &&
-                        issue.longitude != null && (
-                          <p>
-                            <strong>GPS:</strong>{' '}
-                            {issue.latitude}, {issue.longitude}{' '}
-                            <a
-                              href={`https://www.openstreetmap.org/?mlat=${issue.latitude}&mlon=${issue.longitude}#map=17/${issue.latitude}/${issue.longitude}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              View Map
-                            </a>
-                          </p>
-                        )}
-
-                      <p className="status">
-                        <strong>Status:</strong> {statusLabel(issue.status)}
+                      <p className="issue-detail">
+                        <strong>Category:</strong> {issue.category}
                       </p>
+                      <p className="issue-detail">
+                        <strong>Severity:</strong>{' '}
+                        <PriorityBadge issue={issue} />
+                      </p>
+                      <p className="issue-detail">
+                        <strong>Location:</strong> {issue.location}
+                      </p>
+                      <p className="issue-detail">
+                        <strong>Description:</strong> {issue.description}
+                      </p>
+                      <IssueLocation issue={issue} />
                     </article>
                   ))}
                 </div>
@@ -701,44 +991,71 @@ function App() {
         ) : page === 'government' &&
           user?.role === 'GOVERNMENT' ? (
           <>
-            <section className="welcome">
-              <h2>Government Dashboard</h2>
-              <p>
-                Welcome, {user.name || 'Government Officer'}.
-                Monitor complaints and update their progress.
-              </p>
-
-              <button type="button" onClick={loadIssues}>
-                Refresh Dashboard
-              </button>
+            <section className="dashboard-welcome government-welcome">
+              <div>
+                <span className="eyebrow">OFFICIAL ADMINISTRATION</span>
+                <h1>Government Dashboard</h1>
+                <p>
+                  Welcome, {user.name || 'Government Officer'}. Monitor
+                  public complaints and update their progress.
+                </p>
+              </div>
+              <div className="welcome-icon">🏛️</div>
             </section>
 
             <section className="dashboard-stats">
               <article className="stat-card">
-                <h3>Total Issues</h3>
-                <p>{totalIssues}</p>
+                <span className="stat-icon icon-blue">📋</span>
+                <div>
+                  <p>Total Issues</p>
+                  <h2>{totalIssues}</h2>
+                </div>
               </article>
 
               <article className="stat-card">
-                <h3>Pending</h3>
-                <p>{pendingIssues}</p>
+                <span className="stat-icon icon-orange">⏳</span>
+                <div>
+                  <p>Pending</p>
+                  <h2>{pendingIssues}</h2>
+                </div>
               </article>
 
               <article className="stat-card">
-                <h3>In Progress</h3>
-                <p>{inProgressIssues}</p>
+                <span className="stat-icon icon-purple">⚙️</span>
+                <div>
+                  <p>In Progress</p>
+                  <h2>{inProgressIssues}</h2>
+                </div>
               </article>
 
               <article className="stat-card">
-                <h3>Resolved</h3>
-                <p>{resolvedIssues}</p>
+                <span className="stat-icon icon-green">✓</span>
+                <div>
+                  <p>Resolved</p>
+                  <h2>{resolvedIssues}</h2>
+                </div>
               </article>
             </section>
 
             <section className="panel">
               <div className="section-heading">
-                <h2>Manage Civic Issues</h2>
+                <div>
+                  <span className="eyebrow">COMPLAINT MANAGEMENT</span>
+                  <h2>Manage Civic Issues</h2>
+                  <p className="muted">
+                    Review reports and update their status.
+                  </p>
+                </div>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={loadIssues}
+                >
+                  ↻ Refresh
+                </button>
+              </div>
 
+              <div className="filter-row">
                 <label htmlFor="statusFilter">Filter by status</label>
                 <select
                   id="statusFilter"
@@ -755,57 +1072,63 @@ function App() {
               </div>
 
               {filteredIssues.length === 0 ? (
-                <p>No issues match this filter.</p>
+                <div className="empty-state">
+                  <span>📭</span>
+                  <h3>No issues found</h3>
+                  <p>No issues match your selected filter.</p>
+                </div>
               ) : (
                 <div className="issues-list">
                   {filteredIssues.map((issue) => (
                     <article className="issue" key={issue.id}>
+                      <div className="issue-topline">
+                        <span className="issue-id">ISSUE #{issue.id}</span>
+                        <StatusBadge status={issue.status} />
+                      </div>
+
                       <h3>{issue.title}</h3>
-                      <p><strong>Issue ID:</strong> {issue.id}</p>
-                      <p><strong>Category:</strong> {issue.category}</p>
-                      <p><strong>Location:</strong> {issue.location}</p>
-                      <p><strong>Description:</strong> {issue.description}</p>
 
-                      {issue.latitude != null &&
-                        issue.longitude != null && (
-                          <p>
-                            <strong>GPS:</strong>{' '}
-                            {issue.latitude}, {issue.longitude}{' '}
-                            <a
-                              href={`https://www.openstreetmap.org/?mlat=${issue.latitude}&mlon=${issue.longitude}#map=17/${issue.latitude}/${issue.longitude}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              View Map
-                            </a>
-                          </p>
-                        )}
-
-                      <p className="status">
-                        <strong>Current Status:</strong>{' '}
-                        {statusLabel(issue.status)}
+                      <p className="issue-detail">
+                        <strong>Category:</strong> {issue.category}
+                      </p>
+                      <p className="issue-detail">
+                        <strong>Priority:</strong>{' '}
+                        <PriorityBadge issue={issue} />
+                      </p>
+                      <p className="issue-detail">
+                        <strong>Location:</strong> {issue.location}
+                      </p>
+                      <p className="issue-detail">
+                        <strong>Description:</strong> {issue.description}
                       </p>
 
-                      <label htmlFor={`status-${issue.id}`}>
-                        Update Status
-                      </label>
+                      <IssueLocation issue={issue} />
 
-                      <select
-                        id={`status-${issue.id}`}
-                        value={normalizeStatus(issue.status)}
-                        disabled={updatingIssueId === issue.id}
-                        onChange={(event) =>
-                          updateIssueStatus(issue.id, event.target.value)
-                        }
-                      >
-                        <option value="PENDING">Pending</option>
-                        <option value="IN_PROGRESS">In Progress</option>
-                        <option value="RESOLVED">Resolved</option>
-                      </select>
+                      <div className="status-update">
+                        <label htmlFor={`status-${issue.id}`}>
+                          Update Issue Status
+                        </label>
 
-                      {updatingIssueId === issue.id && (
-                        <p>Updating status...</p>
-                      )}
+                        <select
+                          id={`status-${issue.id}`}
+                          value={normalizeStatus(issue.status)}
+                          disabled={updatingIssueId === issue.id}
+                          onChange={(event) =>
+                            updateIssueStatus(
+                              issue.id,
+                              event.target.value
+                            )
+                          }
+                        >
+                          <option value="PENDING">Pending</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="RESOLVED">Resolved</option>
+                        </select>
+
+                        {updatingIssueId === issue.id && (
+                          <p className="muted">Updating status...</p>
+                        )}
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -813,13 +1136,17 @@ function App() {
             </section>
           </>
         ) : (
-          <section className="panel">
+          <section className="panel empty-state">
+            <span>🔐</span>
             <h2>Access denied</h2>
             <p>
-              Please sign in through the correct portal to access
-              your dashboard.
+              Please sign in through the correct portal to access your dashboard.
             </p>
-            <button type="button" onClick={logout}>
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={logout}
+            >
               Return to Home
             </button>
           </section>
@@ -827,7 +1154,15 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Smart Civic Issue Reporting System</p>
+        <div className="footer-brand">
+          <span>🏛️</span>
+          <strong>SMART CIVIC</strong>
+        </div>
+        <p>Working together for cleaner, safer, better communities.</p>
+        <div className="footer-bottom">
+          <span>Smart Civic Issue Reporting System</span>
+          <span>Made for the community ♥</span>
+        </div>
       </footer>
     </div>
   );
